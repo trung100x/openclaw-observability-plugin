@@ -11,7 +11,12 @@
     },
     "protocol": {
       "label": "OTLP Protocol",
-      "help": "Use 'http' for OTLP/HTTP (port 4318) or 'grpc' for OTLP/gRPC (port 4317)"
+      "help": "Use 'http' for OTLP/HTTP (port 4318), 'grpc' for OTLP/gRPC (port 4317), or 'file' to write JSON Lines to fileExportDir."
+    },
+    "fileExportDir": {
+      "label": "File Export Directory",
+      "placeholder": "/tmp/openclaw/otel",
+      "help": "Output directory for protocol='file'. Each signal type is appended to its own .jsonl file. Leave empty to stream to stdout."
     },
     "serviceName": {
       "label": "Service Name",
@@ -49,15 +54,20 @@
     "properties": {
       "endpoint": {
         "type": "string",
-        "description": "OTLP endpoint URL (e.g., http://localhost:4318 for HTTP, http://localhost:4317 for gRPC)"
+        "description": "OTLP endpoint URL (e.g., http://localhost:4318 for HTTP, http://localhost:4317 for gRPC). Ignored when protocol is 'file'."
       },
       "protocol": {
         "type": "string",
         "enum": [
           "http",
-          "grpc"
+          "grpc",
+          "file"
         ],
-        "description": "OTLP export protocol"
+        "description": "OTLP export protocol. 'file' writes JSON Lines to fileExportDir per the OTLP File Exporter spec."
+      },
+      "fileExportDir": {
+        "type": "string",
+        "description": "Output directory for protocol='file'. Each signal is written to its own file ({dir}/traces.jsonl, metrics.jsonl, logs.jsonl). When omitted the file exporter writes to stdout. Ignored when protocol is 'http' or 'grpc'."
       },
       "serviceName": {
         "type": "string",
