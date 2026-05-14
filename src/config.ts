@@ -40,8 +40,11 @@ export type ContentCaptureInput = boolean | Partial<ContentCapturePolicy>;
 export interface OtelObservabilityConfig {
   /** OTLP endpoint URL */
   endpoint: string;
-  /** OTLP export protocol: 'http' (OTLP/HTTP) or 'grpc' (OTLP/gRPC) */
-  protocol: "http" | "grpc";
+  /**
+   * OTLP export protocol: 'http' (OTLP/HTTP), 'grpc' (OTLP/gRPC), or
+   * 'file' (OTLP File Exporter — JSON Lines written to disk or stdout).
+   */
+  protocol: "http" | "grpc" | "file";
   /** OpenTelemetry service name */
   serviceName: string;
   /** Custom headers for OTLP export (e.g., Authorization for Dynatrace) */
@@ -78,6 +81,16 @@ export interface OtelObservabilityConfig {
   sampleRate?: number;
   /** Additional OTel resource attributes */
   resourceAttributes: Record<string, string>;
+  /**
+   * Output directory for the 'file' protocol. Each signal type is written
+   * to its own file ({dir}/traces.jsonl, {dir}/metrics.jsonl,
+   * {dir}/logs.jsonl). The directory is created automatically if it does
+   * not exist. When undefined (the default) the file exporter writes to
+   * stdout, as required by the spec.
+   *
+   * Ignored when protocol is 'http' or 'grpc'.
+   */
+  fileExportDir?: string;
   /** Optional log pipeline filtering configuration */
   logConfig?: Record<string, unknown>;
 }
@@ -219,7 +232,12 @@ export function parseConfig(
 
   return {
     endpoint: typeof obj.endpoint === "string" ? obj.endpoint : DEFAULTS.endpoint,
-    protocol: obj.protocol === "grpc" ? "grpc" : DEFAULTS.protocol,
+    protocol:
+      obj.protocol === "grpc"
+        ? "grpc"
+        : obj.protocol === "file"
+          ? "file"
+          : DEFAULTS.protocol,
     serviceName:
       typeof obj.serviceName === "string" ? obj.serviceName : DEFAULTS.serviceName,
     headers:
@@ -241,6 +259,8 @@ export function parseConfig(
       !Array.isArray(obj.resourceAttributes)
         ? (obj.resourceAttributes as Record<string, string>)
         : DEFAULTS.resourceAttributes,
+    fileExportDir:
+      typeof obj.fileExportDir === "string" ? obj.fileExportDir : undefined,
     logConfig:
       obj.logConfig &&
       typeof obj.logConfig === "object" &&

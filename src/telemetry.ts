@@ -25,6 +25,8 @@ import { MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk
 import { OTLPMetricExporter as OTLPMetricExporterHTTP } from "@opentelemetry/exporter-metrics-otlp-http";
 import { OTLPMetricExporter as OTLPMetricExporterGRPC } from "@opentelemetry/exporter-metrics-otlp-grpc";
 
+import { FileTraceExporter, FileMetricExporter } from "./file-exporter.js";
+
 import type { OtelObservabilityConfig } from "./config.js";
 import { setupGlobalPropagator } from "./propagation.js";
 import {
@@ -322,9 +324,11 @@ export function initTelemetry(config: OtelObservabilityConfig, logger: any): Tel
       }
 
       const traceExporter =
-        config.protocol === "grpc"
-          ? new OTLPTraceExporterGRPC({ url: traceEndpoint, headers: config.headers })
-          : new OTLPTraceExporterHTTP({ url: traceEndpoint, headers: config.headers });
+        config.protocol === "file"
+          ? new FileTraceExporter({ dir: config.fileExportDir })
+          : config.protocol === "grpc"
+            ? new OTLPTraceExporterGRPC({ url: traceEndpoint, headers: config.headers })
+            : new OTLPTraceExporterHTTP({ url: traceEndpoint, headers: config.headers });
 
       // Head-based sampling: when sampleRate is set, wrap a TraceIdRatioBased
       // sampler in a ParentBasedSampler so child spans inherit the root
@@ -359,8 +363,12 @@ export function initTelemetry(config: OtelObservabilityConfig, logger: any): Tel
         config.sampleRate !== undefined
           ? ` sampler=parentbased_traceidratio(${config.sampleRate})`
           : "";
+      const traceDestination =
+        config.protocol === "file"
+          ? (config.fileExportDir ? `${config.fileExportDir}/traces.jsonl` : "stdout")
+          : traceEndpoint;
       logger.info(
-        `[otel] Trace exporter → ${traceEndpoint} (${config.protocol})${samplingNote}`,
+        `[otel] Trace exporter → ${traceDestination} (${config.protocol})${samplingNote}`,
       );
       logger.info("[otel] W3C TraceContext + Baggage propagator registered globally");
     }
@@ -372,9 +380,11 @@ export function initTelemetry(config: OtelObservabilityConfig, logger: any): Tel
 
   if (config.metrics) {
     const metricExporter =
-      config.protocol === "grpc"
-        ? new OTLPMetricExporterGRPC({ url: metricsEndpoint, headers: config.headers })
-        : new OTLPMetricExporterHTTP({ url: metricsEndpoint, headers: config.headers });
+      config.protocol === "file"
+        ? new FileMetricExporter({ dir: config.fileExportDir })
+        : config.protocol === "grpc"
+          ? new OTLPMetricExporterGRPC({ url: metricsEndpoint, headers: config.headers })
+          : new OTLPMetricExporterHTTP({ url: metricsEndpoint, headers: config.headers });
 
     meterProvider = new MeterProvider({
       resource,
@@ -389,7 +399,11 @@ export function initTelemetry(config: OtelObservabilityConfig, logger: any): Tel
     // Register as global meter provider so metrics.getMeter() returns a real meter
     metrics.setGlobalMeterProvider(meterProvider);
 
-    logger.info(`[otel] Metrics exporter → ${metricsEndpoint} (${config.protocol}, interval=${config.metricsIntervalMs}ms)`);
+    const metricsDestination =
+      config.protocol === "file"
+        ? (config.fileExportDir ? `${config.fileExportDir}/metrics.jsonl` : "stdout")
+        : metricsEndpoint;
+    logger.info(`[otel] Metrics exporter → ${metricsDestination} (${config.protocol}, interval=${config.metricsIntervalMs}ms)`);
   }
 
   // ── Instruments ─────────────────────────────────────────────────

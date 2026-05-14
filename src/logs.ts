@@ -5,6 +5,7 @@ import {
 } from "@opentelemetry/sdk-logs";
 import { OTLPLogExporter as OTLPLogExporterHTTP } from "@opentelemetry/exporter-logs-otlp-http";
 import { OTLPLogExporter as OTLPLogExporterGRPC } from "@opentelemetry/exporter-logs-otlp-grpc";
+import { FileLogExporter } from "./file-exporter.js";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
 import { context } from "@opentelemetry/api";
@@ -253,9 +254,11 @@ export function initLogPipeline(
       : config.endpoint;
 
   const logExporter =
-    config.protocol === "grpc"
-      ? new OTLPLogExporterGRPC({ url: logEndpoint, headers: config.headers })
-      : new OTLPLogExporterHTTP({ url: logEndpoint, headers: config.headers });
+    config.protocol === "file"
+      ? new FileLogExporter({ dir: config.fileExportDir })
+      : config.protocol === "grpc"
+        ? new OTLPLogExporterGRPC({ url: logEndpoint, headers: config.headers })
+        : new OTLPLogExporterHTTP({ url: logEndpoint, headers: config.headers });
 
   // ISI-995: mirror the trace/metric Resource — real plugin version from
   // openclaw.plugin.json (not the legacy "0.1.0" placeholder) and an
@@ -327,7 +330,11 @@ export function initLogPipeline(
     }
   };
 
-  logger.info(`[otel-logs] Log exporter → ${logEndpoint} (${config.protocol})`);
+  const logDestination =
+    config.protocol === "file"
+      ? (config.fileExportDir ? `${config.fileExportDir}/logs.jsonl` : "stdout")
+      : logEndpoint;
+  logger.info(`[otel-logs] Log exporter → ${logDestination} (${config.protocol})`);
 
   return {
     loggerProvider,
